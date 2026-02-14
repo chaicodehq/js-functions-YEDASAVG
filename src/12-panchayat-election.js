@@ -65,16 +65,107 @@
  */
 export function createElection(candidates) {
   // Your code here
+  let votes = {};
+  let registeredVoters = new Set();
+  let votedVoters = new Set();
+
+  for (let c of candidates) {
+    votes[c.id] = 0;
+  }
+
+  return {
+    registerVoter(voter) {
+      if (!voter || !voter.id || !voter.name || voter.age === undefined) return false;
+      if (voter.age < 18) return false;
+      if (registeredVoters.has(voter.id)) return false;
+      registeredVoters.add(voter.id);
+      return true;
+    },
+
+    castVote(voterId, candidateId, onSuccess, onError) {
+      if (!registeredVoters.has(voterId)) {
+        return onError('Voter not registered');
+      }
+      if (!candidates.some(c => c.id === candidateId)) {
+        return onError('Invalid candidate');
+      }
+      if (votedVoters.has(voterId)) {
+        return onError('Already voted');
+      }
+      votes[candidateId]++;
+      votedVoters.add(voterId);
+      return onSuccess({ voterId, candidateId });
+    },
+
+    getResults(sortFn) {
+      let results = candidates.map(c => ({
+        id: c.id,
+        name: c.name,
+        party: c.party,
+        votes: votes[c.id]
+      }));
+
+      if (sortFn) {
+        results.sort(sortFn);
+      } else {
+        results.sort((a, b) => b.votes - a.votes);
+      }
+
+      return results;
+    },
+
+    getWinner() {
+      let totalVotes = Object.values(votes).reduce((a, b) => a + b, 0);
+      if (totalVotes === 0) return null;
+
+      let results = this.getResults();
+      return { id: results[0].id, name: results[0].name, party: results[0].party };
+    }
+  };
 }
 
 export function createVoteValidator(rules) {
   // Your code here
+  return (voter) => {
+    if (!voter) {
+      return { valid: false, reason: 'Invalid voter' };
+    }
+
+    for (let field of rules.requiredFields) {
+      if (voter[field] === undefined) {
+        return { valid: false, reason: `Missing field: ${field}` };
+      }
+    }
+
+    if (voter.age < rules.minAge) {
+      return { valid: false, reason: 'Under minimum age' };
+    }
+
+    return { valid: true };
+  };
 }
 
 export function countVotesInRegions(regionTree) {
   // Your code here
+  if (!regionTree || typeof regionTree !== 'object') return 0;
+
+  let total = regionTree.votes || 0;
+
+  if (regionTree.subRegions && Array.isArray(regionTree.subRegions)) {
+    for (let sub of regionTree.subRegions) {
+      total += countVotesInRegions(sub);
+    }
+  }
+
+  return total;
 }
 
 export function tallyPure(currentTally, candidateId) {
   // Your code here
+  let newTally = { ...currentTally };
+  if (newTally[candidateId] === undefined) {
+    newTally[candidateId] = 0;
+  }
+  newTally[candidateId]++;
+  return newTally;
 }
